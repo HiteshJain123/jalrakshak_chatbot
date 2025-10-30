@@ -37,12 +37,27 @@
             margin-left: 8px;
             margin-top: 4px;
         }
+
         .image-bubble, .location-bubble {
             padding: 4px;
             border-radius: 12px;
-            background-color: #DCF8C6;
-            align-self: flex-end;
+            /* REMOVED: background-color: #DCF8C6; and align-self: flex-end; */
+            position: relative;
+            word-wrap: break-word;
+            white-space: pre-wrap;
         }
+        /* New class for user side styling and alignment */
+        .image-bubble.user, .location-bubble.user {
+            background-color: #DCF8C6; /* User Color */
+            align-self: flex-end; /* User Alignment (Right) */
+        }
+        /* New class for bot side styling and alignment */
+        .image-bubble.bot, .location-bubble.bot {
+            background-color: #FFFFFF; /* Bot Color */
+            align-self: flex-start; /* Bot Alignment (Left) */
+        }
+
+
         .options-container {
              align-self: flex-start;
              width: 100%;
@@ -215,9 +230,9 @@
                 type: 'button'
             },
             'PARTNER_PLUMBER': {
-                message: 'That\'s exactly who we need! Our registered plumbers are the heroes who close the loop on leak reports.\n\nPlease visit our partner portal to get registered. An official will get in touch with you shortly.',
+                message: 'That\'s exactly who we need! Our registered plumbers are the heroes who close the loop on leak reports.',
                 options: [
-                    { text: 'Go to Partner Portal', next: 'PARTNER_END' },
+                    
                     { text: 'Back to Main Menu', next: 'START' }
                 ],
                 type: 'button'
@@ -231,13 +246,6 @@
             },
             'PARTNER_OTHER': {
                 message: 'We\'d love to hear your idea. Please send a brief proposal to partners@jalrakshak.org and our team will get back to you!',
-                options: [
-                    { text: 'Back to Main Menu', next: 'START' }
-                ],
-                type: 'button'
-            },
-            'PARTNER_END': { // Simulates clicking an external link
-                message: 'Redirecting you to the Partner Portal... (This is a demo, click below to go back)',
                 options: [
                     { text: 'Back to Main Menu', next: 'START' }
                 ],
@@ -285,8 +293,12 @@
                 bubble.innerHTML = `${content}<span class="chat-time">${time}</span>`;
             } else if (type === 'image') {
                 bubble = document.createElement('div');
-                bubble.className = `image-bubble ${from}`;
-                bubble.innerHTML = `<img src="${content}" alt="Leak report" class="rounded-lg max-w-[200px]"><div class="text-right p-1"><span class="chat-time">${time}</span></div>`;
+                // MODIFIED: Assigns 'image-bubble bot' or 'image-bubble user' class
+                const bubbleClasses = from === 'user' ? 'image-bubble user' : 'image-bubble bot'; 
+                bubble.className = bubbleClasses;
+                // Using max-w-[250px] for better display of the reward image
+                const imgClasses = 'rounded-lg max-w-[250px]'; 
+                bubble.innerHTML = `<img src="${content}" alt="Image" class="${imgClasses}"><div class="text-right p-1"><span class="chat-time">${time}</span></div>`;
             } else if (type === 'location') {
                  bubble = document.createElement('div');
                  bubble.className = `location-bubble ${from}`;
@@ -350,6 +362,33 @@
                 });
             }
             
+	    
+
+            
+            // ** NEW CODE TO INSERT BOT REWARD IMAGE **
+            // ************************************************
+            if (currentState === 'REPORT_RESOLVED') {
+                const imageUrl = 'https://i.ibb.co/7xQNjWfk/a0dd8ea4-bca5-410c-842f-c2f031030823.jpg';
+                
+                // 1. Add the bot's reward image (Note: type is 'image', but from is 'bot')
+                addMessage('bot', 'image', imageUrl);
+
+                // 2. Wait a moment, then display the bot's text and options
+                setTimeout(() => {
+                    setBotTyping(false);
+                    if (flow.message) {
+                        addMessage('bot', 'text', flow.message);
+                    }
+
+                    if (flow.type === 'button') {
+                        addMessage('bot', 'options', { type: 'button', options: flow.options });
+                    }
+                }, 1500); // Delay for the text after the image is shown
+                return;
+            }
+            // ************************************************
+            // ** END NEW CODE **
+            // ************************************************	
             setTimeout(() => {
                 setBotTyping(false);
                 if (flow.message) {
