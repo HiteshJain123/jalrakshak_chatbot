@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jalrakshak Interactive Prototype</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #E5DDD5;
+        }
+        .whatsapp-bg {
+             background-image: url('https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg');
+        }
+        .chat-bubble {
+            max-width: 85%;
+            padding: 8px 12px;
+            border-radius: 12px;
+            position: relative;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        .chat-bubble.user {
+            background-color: #DCF8C6;
+            align-self: flex-end;
+        }
+        .chat-bubble.bot {
+            background-color: #FFFFFF;
+            align-self: flex-start;
+        }
+        .chat-time {
+            font-size: 0.7rem;
+            color: #999;
+            float: right;
+            margin-left: 8px;
+            margin-top: 4px;
+        }
+        .image-bubble, .location-bubble {
+            padding: 4px;
+            border-radius: 12px;
+            background-color: #DCF8C6;
+            align-self: flex-end;
+        }
+        .options-container {
+             align-self: flex-start;
+             width: 100%;
+             max-width: 90%;
+        }
+        /* Animation for new messages */
+        @keyframes pop-in {
+            0% { transform: scale(0.8); opacity: 0; }
+            80% { transform: scale(1.05); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .chat-message {
+            animation: pop-in 0.3s ease-out forwards;
+            transform-origin: bottom left;
+        }
+        .chat-message.user-message {
+            transform-origin: bottom right;
+        }
+        
+        /* Interactive Button Styling */
+        .chat-button {
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .chat-button:hover {
+            background-color: #f0f8ff; /* A light blue hover */
+        }
+        .severity-button:hover {
+             border-color: #3b82f6; /* Blue border on hover */
+             background-color: #eff6ff;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen bg-gray-200 p-4">
+
+    <!-- Phone Mockup -->
+    <div class="w-full max-w-sm h-[85vh] max-h-[750px] bg-white rounded-3xl shadow-2xl border-4 border-gray-800 overflow-hidden flex flex-col">
+        
+        <!-- WhatsApp Header -->
+        <header class="bg-[#075E54] text-white p-3 flex items-center shadow-md z-10">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            <img src="https://placehold.co/40x40/34B7F1/FFFFFF?text=J" alt="Jalrakshak Logo" class="w-10 h-10 rounded-full mr-3 border-2 border-white">
+            <div>
+                <h1 class="font-bold text-lg">Jalrakshak</h1>
+                <p class="text-xs opacity-80">typing...</p>
+            </div>
+        </header>
+
+        <!-- Chat Area -->
+        <main id="chat-area" class="flex-1 p-4 overflow-y-auto flex flex-col space-y-4 whatsapp-bg">
+            <!-- Messages will be injected here by JavaScript -->
+        </main>
+
+        <!-- Input Area -->
+        <footer class="bg-gray-100 p-2 flex items-center border-t border-gray-200">
+            <input id="user-input" type="text" placeholder="Type a message..." class="flex-1 bg-white rounded-full py-2 px-4 focus:outline-none" disabled>
+            <button id="send-button" class="bg-[#25D366] text-white rounded-full p-3 ml-2 cursor-not-allowed" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
+        </footer>
+    </div>
+
+    <script>
+        const chatArea = document.getElementById('chat-area');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const botStatus = document.querySelector('header p');
+
+        let botTyping = false;
+        let currentState = 'START';
+
+        // --- Bot State & Conversation Flow ---
+        
+        // This object holds all possible conversation paths
+        const botFlow = {
+            'START': {
+                message: 'Hello and welcome to Jalrakshak, your very own water-saving buddy! 💧 How can I help you today?',
+                options: [
+                    { text: '💧 Report a leak', next: 'REPORT_START' },
+                    { text: '💡 Learn how to save water', next: 'LEARN_START' },
+                    { text: '🤝 Wish to partner with us', next: 'PARTNER_START' }
+                ],
+                type: 'menu'
+            },
+            // --- 1. Report a Leak Flow ---
+            'REPORT_START': {
+                message: 'Right! Please click a picture of the leak.',
+                options: [
+                    { text: '📷 Click to attach photo', next: 'REPORT_SEVERITY' }
+                ],
+                type: 'button'
+            },
+            'REPORT_SEVERITY': {
+                // This state is triggered after a user "uploads" an image
+                message: 'Great! Now, to help us understand the seriousness, which of these does your leak look most similar to?',
+                options: [
+                    { text: 'Minor Drip', img: 'https://www.comfortecphc.com/_managedFiles/posts/1522255085.jpeg', next: 'REPORT_FREQUENCY' },
+                    { text: 'Steady Stream', img: 'https://nz.rs-cdn.com/images/nwsz8-56ag4/blog/e9203d0977231ff2ec4686bd5061c32c__17a6/zoom793x594z100000cw793@2x.jpg.webp?etag=b0a8086cd2a2fe7966be5b0cf8a43ea0', next: 'REPORT_FREQUENCY' },
+                    { text: 'Noticeable Leak', img: 'https://www.ultratechcement.com/content/dam/ultratechcement/new-blogs-images/water-proofing-8.jpg', next: 'REPORT_FREQUENCY' },
+                    { text: 'Major Gush', img: 'https://biegplumbing.com/wp-content/uploads/2018/07/Water-Line-Break-157615390-585494d23df78ce2c33fc8b7-2.jpg', next: 'REPORT_FREQUENCY' }
+                ],
+                type: 'severity'
+            },
+            'REPORT_FREQUENCY': {
+                message: 'Understood. Next, did you see this leak for the first time, or has it been happening frequently?',
+                options: [
+                    { text: 'First Time', next: 'REPORT_LOCATION' },
+                    { text: 'Happening Frequently', next: 'REPORT_LOCATION' }
+                ],
+                type: 'button'
+            },
+            'REPORT_LOCATION': {
+                message: 'To finish the complaint, please provide the location of the leak.',
+                options: [
+                    { text: '📍 Share Location', next: 'REPORT_COMMENTS' }
+                ],
+                type: 'button'
+            },
+            'REPORT_COMMENTS': {
+                message: 'Thanks! Is there anything else you\'d like to add?',
+                options: [
+                    { text: 'Yes, I have comments', next: 'REPORT_ADD_COMMENT' },
+                    { text: 'No, that\'s all', next: 'REPORT_COMPLETE' }
+                ],
+                type: 'button'
+            },
+            'REPORT_ADD_COMMENT': {
+                message: 'Please type your comments below.',
+                type: 'input', // Special state to enable user text input
+                next: 'REPORT_COMPLETE'
+            },
+            'REPORT_COMPLETE': {
+                message: 'Thank you so much for your report! You\'ve done a great job. Your unique leak ID is <strong>JAL-78B341</strong>. You can use this for any future reference.',
+                next: 'REPORT_RESOLVED',
+                delay: 5000 // Add a delay before the next message
+            },
+            'REPORT_RESOLVED': {
+                message: 'Update on JAL-78B341: Congratulations! The leak you reported has been fixed. Thanks to you, an estimated 50,000 litres of water will be saved per year. You are a true Jalrakshak! 🙏',
+                options: [
+                    { text: 'Back to Main Menu', next: 'START' }
+                ],
+                type: 'button'
+            },
+
+            // --- 2. Learn How to Save Water Flow ---
+            'LEARN_START': {
+                message: 'Great choice! Learning to save water is the first step to becoming a true Jalrakshak.\n\nHere are a few quick tips:\n\n1. 🚱 **Fix Drips:** A dripping tap can waste over 15,000 litres of water a year. Report them to us!\n\n2. 🚿 **Shorter Showers:** Try to keep your shower under 5 minutes.\n\n3. 🚰 **Turn it Off:** Don\'t let the water run while brushing.',
+                options: [
+                    { text: 'More tips, please!', next: 'LEARN_MORE' },
+                    { text: 'Back to Main Menu', next: 'START' }
+                ],
+                type: 'button'
+            },
+            'LEARN_MORE': {
+                message: 'You got it!\n\n4. 🌱 **Water Wisely:** Water your plants early in the morning or late in the evening to reduce evaporation.\n\n5. 🧺 **Full Loads:** Only run your washing machine and dishwasher when they are full.\n\nRemember, every drop counts! 💧',
+                options: [
+                    { text: 'Back to Main Menu', next: 'START' }
+                ],
+                type: 'button'
+            },
+
+            // --- 3. Partnership Flow ---
+            'PARTNER_START': {
+                message: 'That\'s fantastic! We\'re always looking for partners—whether you\'re an individual, a community group, or a plumbing service.',
+                options: [
+                    { text: 'I\'m a Plumber/Service', next: 'PARTNER_PLUMBER' },
+                    { text: 'I\'m a Community Group', next: 'PARTNER_COMMUNITY' },
+                    { text: 'Other', next: 'PARTNER_OTHER' }
+                ],
+                type: 'button'
+            },
+            'PARTNER_PLUMBER': {
+                message: 'That\'s exactly who we need! Our registered plumbers are the heroes who close the loop on leak reports.\n\nPlease visit our partner portal to get registered. An official will get in touch with you shortly.',
+                options: [
+                    { text: 'Go to Partner Portal', next: 'PARTNER_END' },
+                    { text: 'Back to Main Menu', next: 'START' }
+                ],
+                type: 'button'
+            },
+            'PARTNER_COMMUNITY': {
+                message: 'Awesome! Community groups are the heart of Jalrakshak. We can provide resources for awareness campaigns and local events. Please email our community manager at community@jalrakshak.org.',
+                options: [
+                    { text: 'Back to Main Menu', next: 'START' }
+                ],
+                type: 'button'
+            },
+            'PARTNER_OTHER': {
+                message: 'We\'d love to hear your idea. Please send a brief proposal to partners@jalrakshak.org and our team will get back to you!',
+                options: [
+                    { text: 'Back to Main Menu', next: 'START' }
+                ],
+                type: 'button'
+            },
+            'PARTNER_END': { // Simulates clicking an external link
+                message: 'Redirecting you to the Partner Portal... (This is a demo, click below to go back)',
+                options: [
+                    { text: 'Back to Main Menu', next: 'START' }
+                ],
+                type: 'button'
+            }
+        };
+
+        // --- Chat Functions ---
+
+        function formatTime() {
+            return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
+        }
+
+        function setBotTyping(isTyping) {
+            botTyping = isTyping;
+            botStatus.textContent = isTyping ? 'typing...' : 'online';
+        }
+
+        function enableUserInput() {
+            userInput.disabled = false;
+            sendButton.disabled = false;
+            sendButton.classList.remove('cursor-not-allowed');
+            userInput.placeholder = 'Type your comment...';
+            userInput.focus();
+        }
+
+        function disableUserInput() {
+            userInput.disabled = true;
+            sendButton.disabled = true;
+            sendButton.classList.add('cursor-not-allowed');
+            userInput.placeholder = 'Type a message...';
+            userInput.value = '';
+        }
+
+        // Main function to add a message to the chat
+        function addMessage(from, type, content) {
+            const time = formatTime();
+            const messageWrapper = document.createElement('div');
+            messageWrapper.className = `w-full flex flex-col chat-message ${from === 'user' ? 'user-message' : ''}`;
+            
+            let bubble;
+            if (type === 'text') {
+                bubble = document.createElement('div');
+                bubble.className = `chat-bubble ${from}`;
+                bubble.innerHTML = `${content}<span class="chat-time">${time}</span>`;
+            } else if (type === 'image') {
+                bubble = document.createElement('div');
+                bubble.className = `image-bubble ${from}`;
+                bubble.innerHTML = `<img src="${content}" alt="Leak report" class="rounded-lg max-w-[200px]"><div class="text-right p-1"><span class="chat-time">${time}</span></div>`;
+            } else if (type === 'location') {
+                 bubble = document.createElement('div');
+                 bubble.className = `location-bubble ${from}`;
+                 bubble.innerHTML = `<div class="w-[250px]"><img src="https://i0.wp.com/www.smartprix.com/bytes/wp-content/uploads/2024/04/google-maps-ev-car-charging-station.jpeg?fit=1298%2C656&ssl=1" alt="Map location" class="rounded-t-lg w-full h-24 object-cover"><div class="bg-white p-2 rounded-b-lg"><p class="font-semibold text-sm text-gray-800">${content.name}</p><p class="text-xs text-gray-500">Shared Location</p></div></div><div class="text-right p-1"><span class="chat-time">${time}</span></div>`;
+            } else if (type === 'options') {
+                bubble = document.createElement('div');
+                bubble.className = 'options-container bot';
+                let buttonsHTML = `<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">`;
+                
+                content.options.forEach((opt, index) => {
+                    const borderClass = index > 0 ? 'border-t border-gray-200' : '';
+                    if (content.type === 'menu') {
+                        buttonsHTML += `<button class="w-full text-blue-600 font-medium text-left p-3 flex items-center space-x-3 chat-button ${borderClass}" data-next="${opt.next}" data-text="${opt.text}">
+                                            <span>${opt.text.split(' ')[0]}</span>
+                                            <span>${opt.text.substring(opt.text.indexOf(' ') + 1)}</span>
+                                        </button>`;
+                    } else { // button
+                        buttonsHTML += `<button class="w-full text-blue-600 text-center p-3 font-medium chat-button ${borderClass}" data-next="${opt.next}" data-text="${opt.text}">${opt.text}</button>`;
+                    }
+                });
+                buttonsHTML += '</div>';
+                bubble.innerHTML = buttonsHTML;
+            } else if (type === 'severity_options') {
+                 bubble = document.createElement('div');
+                 bubble.className = `options-container bot`;
+                 let optionsHTML = '<div class="bg-white rounded-xl border border-gray-200 p-3 shadow-sm"><div class="grid grid-cols-2 gap-2">';
+                 content.options.forEach(opt => {
+                    optionsHTML += `<div class="text-center rounded-lg border-2 border-gray-200 p-1 cursor-pointer severity-button chat-button" data-next="${opt.next}" data-text="${opt.text}">
+                                        <img src="${opt.img}" class="rounded-md mx-auto mb-2 h-24 w-full object-cover pointer-events-none">
+                                        <p class="text-xs font-semibold text-gray-700 pointer-events-none">${opt.text}</p>
+                                    </div>`;
+                 });
+                 optionsHTML += '</div></div>';
+                 bubble.innerHTML = optionsHTML;
+            }
+
+            messageWrapper.appendChild(bubble);
+            chatArea.appendChild(messageWrapper);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        // Main function to process bot logic
+        function botResponse(nextState) {
+            currentState = nextState;
+            const flow = botFlow[currentState];
+            
+            if (!flow) {
+                console.error('Unknown state:', currentState);
+                return;
+            }
+            
+            setBotTyping(true);
+            
+            // Disable buttons in the last bot message to prevent double-clicks
+            const lastBotMessage = chatArea.querySelector('.options-container:last-child');
+            if (lastBotMessage) {
+                lastBotMessage.querySelectorAll('button, .chat-button').forEach(btn => {
+                    btn.disabled = true;
+                    btn.classList.add('opacity-50', 'cursor-not-allowed');
+                    btn.classList.remove('chat-button');
+                });
+            }
+            
+            setTimeout(() => {
+                setBotTyping(false);
+                if (flow.message) {
+                    addMessage('bot', 'text', flow.message);
+                }
+
+                if (flow.type === 'menu') {
+                    addMessage('bot', 'options', { type: 'menu', options: flow.options });
+                } else if (flow.type === 'button') {
+                    addMessage('bot', 'options', { type: 'button', options: flow.options });
+                } else if (flow.type === 'severity') {
+                    addMessage('bot', 'severity_options', { options: flow.options });
+                } else if (flow.type === 'input') {
+                    enableUserInput();
+                }
+
+                if (flow.delay && flow.next) {
+                    // Handle delayed sequential messages
+                    setTimeout(() => {
+                        botResponse(flow.next);
+                    }, flow.delay);
+                } else if (!flow.options && flow.next && flow.type !== 'input') { // <-- This is the fix
+                    // Handle non-interactive transitions (and NOT input states)
+                    setTimeout(() => {
+                         botResponse(flow.next);
+                    }, 1200);
+                }
+
+            }, 1200); // Simulate bot typing delay
+        }
+
+        // --- Event Handlers ---
+
+        // Handle clicks on dynamic buttons
+        chatArea.addEventListener('click', (e) => {
+            if (botTyping) return; // Don't allow clicks while bot is typing
+
+            const button = e.target.closest('.chat-button');
+            if (button && !button.disabled) {
+                const next = button.dataset.next;
+                const text = button.dataset.text;
+                
+                // Add user's choice as a message
+                addMessage('user', 'text', text);
+
+                // Simulate image/location messages for specific actions
+                if (next === 'REPORT_SEVERITY') {
+                    setTimeout(() => addMessage('user', 'image', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSeFeSnYcJ5hn4gWGbf1bRrafwD18eYCMgjwg&s'), 300);
+                }
+                if (next === 'REPORT_COMMENTS') {
+                    setTimeout(() => addMessage('user', 'location', { name: 'Johannesberg, South Africa' }), 300);
+                }
+
+                // Trigger the next bot state
+                if (next) {
+                    botResponse(next);
+                }
+            }
+        });
+
+        // Handle text input from user
+        function handleTextInput() {
+            const text = userInput.value.trim();
+            if (text && currentState === 'REPORT_ADD_COMMENT') {
+                addMessage('user', 'text', text);
+                disableUserInput();
+                botResponse(botFlow[currentState].next);
+            }
+        }
+        
+        sendButton.addEventListener('click', handleTextInput);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleTextInput();
+        });
+
+        // --- Initial Kick-off ---
+        function startChat() {
+            addMessage('user', 'text', 'hello');
+            setTimeout(() => {
+                botResponse('START');
+            }, 1000);
+        }
+
+        startChat();
+
+    </script>
+</body>
+</html>
+
