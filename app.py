@@ -27,5 +27,5 @@ with open("chatbot.html", "r", encoding="utf-8") as f:
 
 # Embed the HTML inside Streamlit
 # You might still need to adjust the height/width of the iframe itself
-st.components.v1.html(html_code, height=1000, width=None, scrolling=False) 
+st.components.v1.html(html_code, height=900, width=None, scrolling=False) 
 # Set scrolling to False if you want the content in the HTML to handle its own scrolling
